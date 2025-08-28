@@ -1,0 +1,955 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{longtable}
+
+\geometry{margin=1in}
+
+\title{\textbf{Complete Beginner's Guide to Neural Audio Codecs: \\ Understanding Quantization Methods and Audio Processing}}
+\author{Taka Khoo \\ Neural Audio Codec Project with Minh Bui}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{What is a Neural Audio Codec? (In Super Simple Terms)}
+
+\subsection{The Big Picture: Why We Need This}
+
+Imagine you're trying to send a voice message to a friend, but your internet connection is terrible. You have two options:
+\begin{itemize}
+    \item \textbf{Option 1:} Send the full, high-quality audio (might take hours and cost a fortune)
+    \item \textbf{Option 2:} Compress the audio to make it smaller and faster to send (but it might sound worse)
+\end{itemize}
+
+\textbf{The Problem:} How do we make audio files much smaller while keeping them sounding good?
+
+\textbf{Neural Audio Codec Solution:} Use artificial intelligence to find the smartest way to compress audio, learning from millions of examples of what sounds good and what doesn't.
+
+\subsection{The Analogy: Smart File Compression}
+
+Think of it like packing a suitcase:
+\begin{itemize}
+    \item \textbf{Traditional compression:} Like folding clothes randomly - it works but isn't optimal
+    \item \textbf{Neural compression:} Like having a professional packer who knows exactly how to fold and arrange everything to fit perfectly
+\end{itemize}
+
+\subsection{What We're Doing in This Project}
+
+In our project with Minh Bui, we're focusing on one specific part of audio codecs: **quantization methods**. Think of quantization as the "packing strategy" - how we convert continuous audio signals into discrete, compressed representations.
+
+\textbf{Our Goal:} Compare different quantization methods to see which one gives the best balance of:
+\begin{itemize}
+    \item \textbf{Quality:} How good the audio sounds
+    \item \textbf{Compression:} How small the file becomes
+    \item \textbf{Speed:} How fast we can compress/decompress
+    \item \textbf{Stability:} How reliable the method is
+\end{itemize}
+
+\section{Understanding Audio Basics}
+
+\subsection{What is Audio?}
+
+Audio is just sound waves traveling through the air. When you speak, your vocal cords vibrate, creating pressure waves that travel to someone's ear.
+
+\textbf{The Analogy:} Like throwing a rock in a pond:
+\begin{itemize}
+    \item \textbf{The rock hitting water} = your voice starting to speak
+    \item \textbf{The ripples spreading out} = sound waves traveling through air
+    \item \textbf{The ripples reaching the other side} = sound reaching someone's ear
+\end{itemize}
+
+\subsection{How Computers Store Audio}
+
+Computers can't store continuous waves directly. Instead, they:
+\begin{enumerate}
+    \item \textbf{Sample the wave} thousands of times per second (like taking photos of the ripples)
+    \item \textbf{Measure the height} of each sample (like measuring how high each ripple is)
+    \item \textbf{Store these numbers} as a list (like keeping a list of all the measurements)
+\end{enumerate}
+
+\textbf{Example:} If you say "hello" for 1 second:
+\begin{itemize}
+    \item Computer takes 16,000 samples (16 kHz sampling rate)
+    \item Each sample is a number between -32,768 and 32,767 (16-bit audio)
+    \item Total storage: 16,000 × 2 bytes = 32,000 bytes = 32 KB
+\end{itemize}
+
+\subsection{Why Audio Files Are Big}
+
+\textbf{The Problem:} High-quality audio needs lots of samples:
+\begin{itemize}
+    \item \textbf{CD Quality:} 44,100 samples per second × 2 bytes = 88.2 KB per second
+    \textbf{High Quality:} 96,000 samples per second × 4 bytes = 384 KB per second
+    \item \textbf{1 minute of music:} 384 KB × 60 = 23 MB
+    \textbf{1 hour of music:} 23 MB × 60 = 1.38 GB
+\end{itemize}
+
+\textbf{The Solution:} Compression! Find ways to represent the same audio with fewer numbers.
+
+\section{Understanding Quantization Methods}
+
+\subsection{What is Quantization?}
+
+Quantization is like rounding numbers to make them simpler. Instead of storing 3.14159265359..., we might store just 3.14.
+
+\textbf{The Analogy:} Like measuring time:
+\begin{itemize}
+    \item \textbf{Exact time:} 2:37:42.156 seconds (very precise, needs lots of storage)
+    \textbf{Quantized time:} 2:38 minutes (less precise, needs less storage)
+\end{itemize}
+
+\subsection{Why Quantization Matters}
+
+\textbf{The Trade-off:}
+\begin{itemize}
+    \item \textbf{More quantization} = smaller files but worse quality
+    \textbf{Less quantization} = better quality but bigger files
+\end{itemize}
+
+\textbf{The Challenge:} Find the sweet spot where files are small enough but quality is still good enough.
+
+\section{Vector Quantization (VQ): The Simple Method}
+
+\subsection{What is Vector Quantization?}
+
+Vector Quantization is like creating a "dictionary" of common audio patterns and using codes to represent them.
+
+\textbf{The Analogy:} Like using emojis instead of words:
+\begin{itemize}
+    \item \textbf{Instead of writing:} "I'm happy today!"
+    \textbf{Use emoji:} 😊
+    \item \textbf{Instead of storing:} 1000 audio samples
+    \textbf{Use code:} "A7" (which means "happy sound pattern")
+\end{itemize}
+
+\subsection{How VQ Works}
+
+\begin{enumerate}
+    \item \textbf{Create a codebook:} Find common patterns in your audio data
+    \item \textbf{Assign codes:} Give each pattern a unique number (like A1, A2, A3...)
+    \item \textbf{Replace patterns:} Instead of storing the actual audio, store the code
+    \item \textbf{Reconstruct:} When playing back, look up the code to get the original pattern
+\end{enumerate}
+
+\textbf{Example:} If you have 1 second of audio:
+\begin{itemize}
+    \item \textbf{Original:} 16,000 numbers (32 KB)
+    \textbf{VQ compressed:} 100 codes (200 bytes)
+    \textbf{Compression ratio:} 160:1 (160 times smaller!)
+\end{itemize}
+
+\subsection{The Mathematics of VQ}
+
+\textbf{The Basic Idea:} Find the closest codebook entry to your input vector.
+
+\textbf{Mathematical Formula:} For input vector $x$ and codebook vectors $\{c_1, c_2, ..., c_K\}$:
+$$q(x) = \arg\min_{i} \|x - c_i\|^2$$
+
+This means: "Find the codebook entry $c_i$ that's closest to our input $x$."
+
+\textbf{What This Means:}
+\begin{itemize}
+    \item \texttt{argmin} = "find the index that gives the minimum value"
+    \item $\|x - c_i\|^2$ = "squared distance between input and codebook entry"
+    \item $q(x)$ = "the quantized version of our input"
+\end{itemize}
+
+\subsection{Strengths of VQ}
+
+\begin{itemize}
+    \item \textbf{Simple:} Easy to understand and implement
+    \textbf{Fast:} Very quick to compress and decompress
+    \item \textbf{Stable:} Always gives the same result
+    \textbf{Memory efficient:} Only need to store the codebook
+\end{itemize}
+
+\subsection{Weaknesses of VQ}
+
+\begin{itemize}
+    \item \textbf{Limited expressivity:} Can only represent what's in the codebook
+    \textbf{Codebook collapse:} Sometimes many codes end up representing the same thing
+    \item \textbf{Poor gradient flow:} Hard to train with neural networks
+    \textbf{Fixed bitrate:} Can't easily adjust compression level
+\end{itemize}
+
+\section{Residual Vector Quantization (RVQ): The Layered Method}
+
+\subsection{What is Residual Vector Quantization?}
+
+RVQ is like VQ but with multiple layers. Instead of trying to represent everything in one step, we do it progressively.
+
+\textbf{The Analogy:} Like building a house:
+\begin{itemize}
+    \item \textbf{VQ approach:} Try to build the entire house perfectly in one step
+    \textbf{RVQ approach:} 
+    \begin{itemize}
+        \item Layer 1: Build the foundation (basic structure)
+        \item Layer 2: Add the walls (refine the structure)
+        \item Layer 3: Add the roof (final details)
+    \end{itemize}
+\end{itemize}
+
+\subsection{How RVQ Works}
+
+\begin{enumerate}
+    \item \textbf{First quantization:} Use VQ to approximate the audio signal
+    \item \textbf{Calculate residual:} Find what's left over (the error)
+    \item \textbf{Second quantization:} Use another VQ to approximate the residual
+    \item \textbf{Repeat:} Keep going until the residual is small enough
+\end{enumerate}
+
+\textbf{Mathematical Formula:} For input $x$ and $L$ quantization stages:
+\begin{align}
+x_0 &= x \\
+r_1 &= x_0 - Q_1(x_0) \\
+r_2 &= r_1 - Q_2(r_1) \\
+&\vdots \\
+r_L &= r_{L-1} - Q_L(r_{L-1})
+\end{align}
+
+Where:
+\begin{itemize}
+    \item $x_0$ is the original input
+    \item $r_i$ is the residual at stage $i$
+    \item $Q_i$ is the quantization function at stage $i$
+\end{itemize}
+
+\textbf{The Final Output:} The sum of all quantized values:
+$$x_{reconstructed} = Q_1(x_0) + Q_2(r_1) + Q_3(r_2) + ... + Q_L(r_{L-1})$$
+
+\subsection{Why RVQ is Better Than VQ}
+
+\begin{itemize}
+    \item \textbf{More expressive:} Can represent more complex patterns
+    \textbf{Progressive refinement:} Each layer adds more detail
+    \item \textbf{Variable bitrate:} Can stop early for lower quality, continue for higher quality
+    \textbf{Better quality:} Usually sounds better than single-stage VQ
+\end{itemize}
+
+\subsection{Why RVQ is More Complex}
+
+\begin{itemize}
+    \item \textbf{Slower:} Need to go through multiple stages
+    \textbf{More memory:} Need to store multiple codebooks
+    \item \textbf{Sequential:} Can't process stages in parallel
+    \textbf{More parameters:} Harder to train and tune
+\end{itemize}
+
+\section{Product Quantization (PQ): The Parallel Method}
+
+\subsection{What is Product Quantization?}
+
+Product Quantization is like breaking a big problem into smaller, parallel problems.
+
+\textbf{The Analogy:} Like organizing a big party:
+\begin{itemize}
+    \item \textbf{Traditional approach:} One person tries to organize everything
+    \textbf{PQ approach:} Break it into committees:
+    \begin{itemize}
+        \item Food committee handles food
+        \item Music committee handles music
+        \item Decorations committee handles decorations
+    \end{itemize}
+\end{itemize}
+
+\subsection{How PQ Works}
+
+\begin{enumerate}
+    \item \textbf{Split the vector:} Break your audio vector into subvectors
+    \item \textbf{Quantize separately:} Apply VQ to each subvector independently
+    \item \textbf{Combine results:} Put all the quantized subvectors back together
+\end{enumerate}
+
+\textbf{Mathematical Formula:} For input vector $x$ split into $M$ subvectors:
+$$x = [x_1, x_2, ..., x_M]$$
+
+Each subvector $x_i$ is quantized independently:
+$$q_i(x_i) = \arg\min_{j} \|x_i - c_{i,j}\|^2$$
+
+The final quantized vector is:
+$$q(x) = [q_1(x_1), q_2(x_2), ..., q_M(x_M)]$$
+
+\subsection{Why PQ is Fast}
+
+\begin{itemize}
+    \item \textbf{Parallel processing:} All subvectors can be quantized at the same time
+    \textbf{Smaller codebooks:} Each subvector has its own, smaller codebook
+    \item \textbf{Efficient search:} Finding the best match is faster in smaller spaces
+    \textbf{Memory efficient:} Can use smaller, specialized codebooks
+\end{itemize}
+
+\subsection{Why PQ Might Be Worse}
+
+\begin{itemize}
+    \item \textbf{Loses correlations:} Might miss patterns that span across subvectors
+    \textbf{Suboptimal partitioning:} The way we split the vector matters a lot
+    \textbf{Not always perceptually good:} What's mathematically optimal might not sound good
+\end{itemize}
+
+\section{Gumbel-Softmax Quantization: The Differentiable Method}
+
+\subsection{What is Gumbel-Softmax?}
+
+Gumbel-Softmax is like VQ but "soft" - it can be trained with gradient descent, making it work better with neural networks.
+
+\textbf{The Analogy:} Like learning to cook:
+\begin{itemize}
+    \item \textbf{VQ approach:} You have to choose exactly one recipe (hard decision)
+    \textbf{Gumbel-Softmax approach:} You can blend multiple recipes together (soft decision)
+\end{itemize}
+
+\subsection{The Problem with VQ in Neural Networks}
+
+\textbf{The Issue:} VQ makes "hard" decisions (choose exactly one codebook entry), but neural networks need "soft" decisions to calculate gradients.
+
+\textbf{The Solution:} Gumbel-Softmax makes the quantization differentiable by adding randomness and temperature.
+
+\subsection{How Gumbel-Softmax Works}
+
+\begin{enumerate}
+    \item \textbf{Calculate logits:} Find how similar your input is to each codebook entry
+    \item \textbf{Add Gumbel noise:} Add random noise to make it stochastic
+    \item \textbf{Apply softmax:} Convert to probabilities
+    \item \textbf{Scale by temperature:} Control how "sharp" the distribution is
+    \item \textbf{Sample:} Choose a codebook entry based on the probabilities
+\end{enumerate}
+
+\textbf{Mathematical Formula:} For input $x$ and codebook $\{c_1, c_2, ..., c_K\}$:
+
+First, calculate similarities:
+$$s_i = \text{similarity}(x, c_i)$$
+
+Add Gumbel noise:
+$$g_i = s_i + \epsilon_i \quad \text{where } \epsilon_i \sim \text{Gumbel}(0,1)$$
+
+Apply softmax with temperature $\tau$:
+$$p_i = \frac{\exp(g_i / \tau)}{\sum_{j=1}^K \exp(g_j / \tau)}$$
+
+The quantized output is:
+$$q(x) = \sum_{i=1}^K p_i \cdot c_i$$
+
+\subsection{Why Gumbel-Softmax is Powerful}
+
+\begin{itemize}
+    \item \textbf{Differentiable:} Can be trained with gradient descent
+    \textbf{Learnable:} The quantization can improve during training
+    \item \textbf{Flexible:} Can blend multiple codebook entries
+    \textbf{Better gradients:} More stable training than hard VQ
+\end{itemize}
+
+\subsection{Why Gumbel-Softmax is Complex}
+
+\begin{itemize}
+    \item \textbf{Temperature scheduling:} Need to carefully control the temperature parameter
+    \textbf{Not truly discrete:} The output is a weighted average, not a single entry
+    \item \textbf{More computation:} Need to calculate probabilities and weighted sums
+    \textbf{Hyperparameter tuning:} More parameters to adjust
+\end{itemize}
+
+\section{Understanding the Audio Codec Architecture}
+
+\subsection{The Basic Structure}
+
+A neural audio codec has three main parts:
+\begin{enumerate}
+    \item \textbf{Encoder:} Converts audio into a compressed representation
+    \item \textbf{Quantizer:} Makes the representation discrete (this is what we're studying)
+    \item \textbf{Decoder:} Converts the compressed representation back to audio
+\end{enumerate}
+
+\textbf{The Analogy:} Like a translation service:
+\begin{itemize}
+    \item \textbf{Encoder:} English speaker who understands your message
+    \textbf{Quantizer:} The translator who converts it to another language
+    \item \textbf{Decoder:} Someone who speaks that language and converts it back
+\end{itemize}
+
+\subsection{The Encoder}
+
+The encoder is like a smart audio analyzer:
+\begin{itemize}
+    \item \textbf{Input:} Raw audio samples (like 16,000 numbers for 1 second)
+    \textbf{Processing:} Convolutional layers, recurrent layers, attention mechanisms
+    \item \textbf{Output:} A compressed representation (like 100 numbers)
+\end{itemize}
+
+\textbf{What the Encoder Learns:}
+\begin{itemize}
+    \item Which audio features are important
+    \item How to represent audio efficiently
+    \item What patterns to look for
+\end{itemize}
+
+\subsection{The Quantizer}
+
+The quantizer is what we're studying in this project:
+\begin{itemize}
+    \item \textbf{Input:} Continuous representation from encoder
+    \textbf{Processing:} VQ, RVQ, PQ, or Gumbel-Softmax
+    \item \textbf{Output:} Discrete, compressed representation
+\end{itemize}
+
+\textbf{Why Quantization Matters:}
+\begin{itemize}
+    \item \textbf{Compression:} Makes the representation much smaller
+    \textbf{Discrete:} Can be stored and transmitted efficiently
+    \item \textbf{Trade-off:} Smaller size vs. better quality
+\end{itemize}
+
+\subsection{The Decoder}
+
+The decoder is like a smart audio synthesizer:
+\begin{itemize}
+    \item \textbf{Input:} Discrete representation from quantizer
+    \textbf{Processing:} Convolutional layers, recurrent layers, upsampling
+    \item \textbf{Output:} Reconstructed audio
+\end{itemize}
+
+\textbf{What the Decoder Learns:}
+\begin{itemize}
+    \item How to reconstruct audio from compressed representation
+    \item Which details to emphasize
+    \item How to make the output sound natural
+\end{itemize}
+
+\section{Understanding the Training Process}
+
+\subsection{How Neural Codecs Learn}
+
+Neural codecs learn through a process called "end-to-end training":
+\begin{enumerate}
+    \item \textbf{Forward pass:} Audio goes through encoder → quantizer → decoder
+    \item \textbf{Calculate loss:} Compare original audio to reconstructed audio
+    \item \textbf{Backward pass:} Calculate gradients and update all parameters
+    \item \textbf{Repeat:} Do this millions of times with different audio samples
+\end{enumerate}
+
+\textbf{The Analogy:} Like learning to draw:
+\begin{enumerate}
+    \item \textbf{Try to draw:} Make your best attempt at drawing a cat
+    \textbf{Compare:} Look at your drawing vs. a real cat photo
+    \item \textbf{Learn:} Figure out what you did wrong
+    \textbf{Practice:} Try again with what you learned
+\end{enumerate}
+
+\subsection{The Loss Function}
+
+The loss function measures how different the original and reconstructed audio are:
+
+\textbf{Common Loss Functions:}
+\begin{itemize}
+    \item \textbf{L1 Loss:} $\mathcal{L}_{L1} = \frac{1}{N} \sum_{i=1}^N |x_i - \hat{x}_i|$
+    \textbf{L2 Loss:} $\mathcal{L}_{L2} = \frac{1}{N} \sum_{i=1}^N (x_i - \hat{x}_i)^2$
+    \item \textbf{Perceptual Loss:} How different the audio "sounds" to humans
+    \textbf{Adversarial Loss:} How realistic the reconstructed audio sounds
+\end{itemize}
+
+\textbf{What Each Loss Measures:}
+\begin{itemize}
+    \item \textbf{L1/L2:} Mathematical difference between original and reconstruction
+    \textbf{Perceptual:} How similar the audio sounds to humans
+    \item \textbf{Adversarial:} How well the reconstruction fools a discriminator
+\end{itemize}
+
+\subsection{The Training Challenges}
+
+\textbf{Challenge 1: Quantization is Not Differentiable}
+\begin{itemize}
+    \item \textbf{Problem:} VQ makes hard decisions that can't be differentiated
+    \textbf{Solutions:} Use Gumbel-Softmax, straight-through estimator, or proxy losses
+\end{itemize}
+
+\textbf{Challenge 2: Codebook Collapse}
+\begin{itemize}
+    \item \textbf{Problem:} Many codebook entries end up representing the same thing
+    \textbf{Solutions:} Regularization, diversity constraints, or better initialization
+\end{itemize}
+
+\textbf{Challenge 3: Training Stability}
+\begin{itemize}
+    \item \textbf{Problem:} Training can be unstable due to quantization
+    \textbf{Solutions:} Careful learning rate scheduling, gradient clipping, or warm-up
+\end{itemize}
+
+\section{Understanding the Evaluation Metrics}
+
+\subsection{How We Measure Quality}
+
+\textbf{Objective Metrics:} Numbers that measure audio quality mathematically
+\begin{itemize}
+    \item \textbf{Signal-to-Noise Ratio (SNR):} How much signal vs. noise
+    \textbf{Signal-to-Distortion Ratio (SDR):} How much signal vs. distortion
+    \item \textbf{Scale-Invariant SDR (SI-SDR):} SDR that's not affected by volume changes
+\end{itemize}
+
+\textbf{Subjective Metrics:} How good the audio sounds to human listeners
+\begin{itemize}
+    \item \textbf{Mean Opinion Score (MOS):} Average rating from human listeners
+    \textbf{ABX Testing:} Can listeners tell which audio is better?
+    \item \textbf{Preference Testing:} Which version do listeners prefer?
+\end{itemize}
+
+\subsection{How We Measure Compression}
+
+\textbf{Bitrate:} How many bits we use per second of audio
+\begin{itemize}
+    \item \textbf{Low bitrate:} 8-32 kbps (like old cell phones)
+    \textbf{Medium bitrate:} 64-128 kbps (like MP3)
+    \item \textbf{High bitrate:} 256-320 kbps (like high-quality MP3)
+    \textbf{Very high bitrate:} 1000+ kbps (like lossless audio)
+\end{itemize}
+
+\textbf{Compression Ratio:} How much smaller the compressed file is
+\begin{itemize}
+    \item \textbf{10:1 compression:} File is 10 times smaller
+    \textbf{100:1 compression:} File is 100 times smaller
+    \item \textbf{1000:1 compression:} File is 1000 times smaller
+\end{itemize}
+
+\subsection{How We Measure Speed}
+
+\textbf{Encoding Time:} How long it takes to compress audio
+\begin{itemize}
+    \item \textbf{Real-time:} Can compress 1 second of audio in less than 1 second
+    \textbf{Faster than real-time:} Can compress 1 second of audio in 0.1 seconds
+    \item \textbf{Slower than real-time:} Takes 10 seconds to compress 1 second of audio
+\end{itemize}
+
+\textbf{Decoding Time:} How long it takes to decompress audio
+\begin{itemize}
+    \item \textbf{Real-time:} Can play back compressed audio without delays
+    \textbf{Faster than real-time:} Can play back faster than normal speed
+    \item \textbf{Slower than real-time:} There are delays during playback
+\end{itemize}
+
+\section{Understanding the Implementation}
+
+\subsection{The Project Structure}
+
+Our audio codec project is organized as follows:
+\begin{itemize}
+    \item \texttt{models/}: Different neural network architectures
+    \item \texttt{quantizers/}: Different quantization methods (VQ, RVQ, PQ, Gumbel-Softmax)
+    \item \texttt{datasets/}: Audio datasets for training and testing
+    \item \texttt{training/}: Training scripts and utilities
+    \item \texttt{evaluation/}: Code for measuring performance
+    \item \texttt{utils/}: Helper functions and utilities
+\end{itemize}
+
+\subsection{The Main Training Script}
+
+Here's what a typical training script looks like:
+
+\begin{lstlisting}[language=Python, basicstyle=\small]
+def train_audio_codec():
+    # Load dataset
+    train_loader = load_audio_dataset('train')
+    val_loader = load_audio_dataset('val')
+    
+    # Create model
+    encoder = AudioEncoder()
+    quantizer = VectorQuantizer(codebook_size=512, embedding_dim=64)
+    decoder = AudioDecoder()
+    
+    # Create optimizer
+    optimizer = torch.optim.Adam([
+        {'params': encoder.parameters()},
+        {'params': quantizer.parameters()},
+        {'params': decoder.parameters()}
+    ], lr=1e-4)
+    
+    # Training loop
+    for epoch in range(num_epochs):
+        for batch in train_loader:
+            # Forward pass
+            audio = batch['audio']
+            encoded = encoder(audio)
+            quantized = quantizer(encoded)
+            reconstructed = decoder(quantized)
+            
+            # Calculate loss
+            loss = calculate_loss(audio, reconstructed)
+            
+            # Backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+\end{lstlisting}
+
+\textbf{What This Does Step by Step:}
+\begin{enumerate}
+    \item Load training and validation data
+    \item Create the encoder, quantizer, and decoder
+    \item Set up the optimizer to update parameters
+    \item For each training batch:
+    \begin{itemize}
+        \item Pass audio through the model
+        \item Calculate how good the reconstruction is
+        \item Update the model to do better
+    \end{itemize}
+\end{enumerate}
+
+\subsection{The Quantizer Implementation}
+
+Here's what a basic VQ quantizer looks like:
+
+\begin{lstlisting}[language=Python, basicstyle=\small]
+class VectorQuantizer(nn.Module):
+    def __init__(self, codebook_size, embedding_dim):
+        super().__init__()
+        self.codebook_size = codebook_size
+        self.embedding_dim = embedding_dim
+        
+        # Create the codebook
+        self.embedding = nn.Embedding(codebook_size, embedding_dim)
+        self.embedding.weight.data.uniform_(-1/32, 1/32)
+    
+    def forward(self, z):
+        # z has shape (batch_size, seq_len, embedding_dim)
+        batch_size, seq_len, embedding_dim = z.shape
+        
+        # Reshape for easier processing
+        z_flat = z.view(-1, embedding_dim)
+        
+        # Find closest codebook entry
+        distances = torch.cdist(z_flat, self.embedding.weight)
+        indices = torch.argmin(distances, dim=1)
+        
+        # Get quantized vectors
+        quantized = self.embedding(indices)
+        
+        # Reshape back
+        quantized = quantized.view(batch_size, seq_len, embedding_dim)
+        
+        return quantized, indices
+\end{lstlisting}
+
+\textbf{What This Does:}
+\begin{enumerate}
+    \item Create a codebook of learnable vectors
+    \item For each input vector, find the closest codebook entry
+    \item Return the quantized vector and the index used
+\end{enumerate}
+
+\subsection{The Loss Calculation}
+
+Here's how we calculate the training loss:
+
+\begin{lstlisting}[language=Python, basicstyle=\small]
+def calculate_loss(original, reconstructed, indices, embedding):
+    # Reconstruction loss (how different the audio sounds)
+    recon_loss = F.mse_loss(reconstructed, original)
+    
+    # Commitment loss (keep encoder output close to codebook)
+    commit_loss = F.mse_loss(embedding, original.detach())
+    
+    # Total loss
+    total_loss = recon_loss + 0.25 * commit_loss
+    
+    return total_loss
+\end{lstlisting}
+
+\textbf{What Each Loss Term Does:}
+\begin{itemize}
+    \item \textbf{Reconstruction loss:} Make the output sound like the input
+    \textbf{Commitment loss:} Make the encoder output close to codebook entries
+    \item \textbf{Total loss:} Weighted combination of both terms
+\end{itemize}
+
+\section{Understanding the Experiments}
+
+\subsection{What We're Testing}
+
+In our project, we're comparing different quantization methods:
+\begin{itemize}
+    \item \textbf{Baseline:} No quantization (just encoder-decoder)
+    \textbf{VQ:} Basic vector quantization
+    \item \textbf{RVQ:} Residual vector quantization with 2-4 stages
+    \textbf{PQ:} Product quantization with different splits
+    \item \textbf{Gumbel-Softmax:} Differentiable quantization
+\end{itemize}
+
+\subsection{The Speech Enhancement Task}
+
+We're using speech enhancement as our test case:
+\begin{itemize}
+    \item \textbf{Input:} Noisy speech (speech with background noise)
+    \textbf{Output:} Clean speech (speech with noise removed)
+    \item \textbf{Goal:} See which quantization method works best for this task
+\end{itemize}
+
+\textbf{Why Speech Enhancement?}
+\begin{itemize}
+    \item \textbf{Simple:} Easy to understand and evaluate
+    \textbf{Realistic:} Practical application that people care about
+    \item \textbf{Challenging:} Tests the limits of our quantization methods
+\end{itemize}
+
+\subsection{The Datasets We'll Use}
+
+\textbf{VCTK Dataset:} Multi-speaker English speech corpus
+\begin{itemize}
+    \item \textbf{Size:} 44 hours of speech from 109 speakers
+    \textbf{Quality:} High-quality recordings in quiet environments
+    \item \textbf{Use:} Training and testing our models
+\end{itemize}
+
+\textbf{LibriSpeech Dataset:} Large-scale audiobook dataset
+\begin{itemize}
+    \item \textbf{Size:} 1000 hours of speech from 2484 speakers
+    \textbf{Quality:} Professional audiobook recordings
+    \item \textbf{Use:} Training on larger, more diverse data
+\end{itemize}
+
+\textbf{Custom Noisy Speech:} We'll create this by adding noise to clean speech
+\begin{itemize}
+    \item \textbf{Method:} Add white noise, pink noise, or real-world noise
+    \textbf{Control:} We know exactly what the clean version should be
+    \item \textbf{Use:} Testing how well our models can remove noise
+\end{itemize}
+
+\section{Understanding the Results}
+
+\subsection{What We'll Measure}
+
+\textbf{Quality Metrics:}
+\begin{itemize}
+    \item \textbf{SI-SDR:} How much the signal quality improves
+    \textbf{PESQ:} How good the speech sounds to humans
+    \item \textbf{STOI:} How intelligible the speech is
+\end{itemize}
+
+\textbf{Compression Metrics:}
+\begin{itemize}
+    \item \textbf{Bitrate:} How many bits per second we use
+    \textbf{Compression ratio:} How much smaller the files are
+    \item \textbf{Model size:} How big our trained models are
+\end{itemize}
+
+\textbf{Speed Metrics:}
+\begin{itemize}
+    \item \textbf{Training time:} How long it takes to train
+    \textbf{Inference time:} How long it takes to process new audio
+    \item \textbf{Memory usage:} How much RAM/GPU memory we need
+\end{itemize}
+
+\subsection{How to Interpret Results}
+
+\textbf{Good Results Look Like:}
+\begin{itemize}
+    \item \textbf{Quality:} Reconstructed audio sounds almost as good as original
+    \textbf{Compression:} Files are 10-100 times smaller
+    \item \textbf{Speed:} Can process audio in real-time or faster
+\end{itemize}
+
+\textbf{What to Look For:}
+\begin{itemize}
+    \item \textbf{Trade-offs:} Which method gives the best quality/size balance?
+    \textbf{Consistency:} Does the method work well on different types of audio?
+    \item \textbf{Robustness:} Does it work well with different noise levels?
+\end{itemize}
+
+\section{Common Problems and Solutions}
+
+\subsection{Problem 1: Poor Audio Quality}
+
+\textbf{Symptoms:}
+\begin{itemize}
+    \item Reconstructed audio sounds muffled or distorted
+    \item High loss values that don't decrease
+    \item Audio quality gets worse during training
+\end{itemize}
+
+\textbf{Solutions:}
+\begin{itemize}
+    \item \textbf{Check quantization:} Make sure codebook entries are diverse
+    \textbf{Adjust loss weights:} Balance reconstruction vs. commitment loss
+    \item \textbf{Use better loss:} Try perceptual or adversarial losses
+    \textbf{Increase model capacity:} Use bigger encoder/decoder
+\end{itemize}
+
+\subsection{Problem 2: Codebook Collapse}
+
+\textbf{Symptoms:}
+\begin{itemize}
+    \item Many codebook entries are identical or very similar
+    \item Poor compression because codebook isn't diverse
+    \item Training gets stuck at high loss values
+\end{itemize}
+
+\textbf{Solutions:}
+\begin{itemize}
+    \item \textbf{Regularization:} Add diversity constraints to the loss
+    \textbf{Better initialization:} Initialize codebook with diverse values
+    \item \textbf{Codebook updates:} Periodically reset unused codebook entries
+    \textbf{Commitment loss:} Use commitment loss to prevent collapse
+\end{itemize}
+
+\subsection{Problem 3: Training Instability}
+
+\textbf{Symptoms:}
+\begin{itemize}
+    \item Loss values jump around wildly
+    \item Model parameters become very large or NaN
+    \item Training crashes or produces poor results
+\end{itemize}
+
+\textbf{Solutions:}
+\begin{itemize}
+    \item \textbf{Gradient clipping:} Limit how big gradients can become
+    \textbf{Learning rate:} Use smaller learning rate or learning rate scheduling
+    \item \textbf{Warm-up:} Start with small learning rate and gradually increase
+    \textbf{Batch normalization:} Add batch norm layers for stability
+\end{itemize}
+
+\section{How to Contribute to the Project}
+
+\subsection{What You Should Do First}
+
+\begin{enumerate}
+    \item \textbf{Understand the basics:} Read this document thoroughly
+    \textbf{Run simple experiments:} Start with basic VQ on small datasets
+    \item \textbf{Analyze results:} Look at the metrics and understand what they mean
+    \textbf{Try different parameters:} Experiment with codebook sizes, embedding dimensions
+    \item \textbf{Document findings:} Keep notes on what works and what doesn't
+\end{enumerate}
+
+\subsection{Areas for Improvement}
+
+\begin{itemize}
+    \item \textbf{Better quantization:} Find more effective quantization methods
+    \textbf{Improved loss functions:} Design losses that work better for audio
+    \item \textbf{Architecture improvements:} Try different encoder/decoder designs
+    \textbf{Training tricks:} Find ways to make training more stable
+    \item \textbf{Evaluation:} Design better ways to measure audio quality
+\end{itemize}
+
+\subsection{Research Questions to Explore}
+
+\begin{itemize}
+    \item \textbf{Which quantization method works best for speech?} Why?
+    \textbf{How does codebook size affect quality vs. compression?}
+    \item \textbf{Can we predict which method will work best for a given task?}
+    \textbf{How do different loss functions affect the results?}
+    \item \textbf{What makes some audio samples harder to compress than others?}
+\end{itemize}
+
+\section{Understanding the Big Picture}
+
+\subsection{Why This Research Matters}
+
+\begin{itemize}
+    \item \textbf{Better compression:} More efficient audio storage and transmission
+    \textbf{Lower bandwidth:} Better audio quality over slow internet connections
+    \item \textbf{Real-time applications:} Better audio in video calls, gaming, etc.
+    \textbf{Edge devices:} Better audio processing on phones and smart devices
+    \item \textbf{Scientific understanding:} Learn how to represent audio efficiently
+\end{itemize}
+
+\subsection{The Broader Context}
+
+This work fits into several larger research areas:
+\begin{itemize}
+    \item \textbf{Neural Compression:} Using AI to compress all types of data
+    \textbf{Audio Processing:} Making computers better at understanding audio
+    \item \textbf{Quantization:} Converting continuous values to discrete ones
+    \textbf{Representation Learning:} Finding good ways to represent complex data
+    \item \textbf{End-to-End Learning:} Training entire systems together
+\end{itemize}
+
+\subsection{Your Role in the Project}
+
+As a researcher on this project, you should:
+\begin{itemize}
+    \item \textbf{Understand the code:} Know what every function does
+    \textbf{Run experiments:} Test different methods and parameters
+    \item \textbf{Analyze results:} Figure out what the numbers mean
+    \textbf{Identify patterns:} Find what makes methods work or fail
+    \item \textbf{Propose improvements:} Suggest ways to make the system better
+    \textbf{Document everything:} Keep detailed notes for the research team
+\end{itemize}
+
+\section{Conclusion}
+
+\subsection{What You Should Know Now}
+
+After reading this document, you should understand:
+\begin{itemize}
+    \item What neural audio codecs are and why they're important
+    \item How different quantization methods work
+    \item The mathematics behind each method
+    \item How to implement and train these systems
+    \item How to evaluate and compare different approaches
+    \item How to contribute to improving the system
+\end{itemize}
+
+\subsection{Next Steps}
+
+\begin{enumerate}
+    \item \textbf{Read the code:} Go through each file line by line
+    \textbf{Run experiments:} Start with simple cases and build up
+    \item \textbf{Ask questions:} Don't hesitate to ask for clarification
+    \textbf{Take notes:} Document everything you learn
+    \item \textbf{Think critically:} Question assumptions and look for improvements
+    \textbf{Contribute ideas:} Share your insights with Minh and the team
+\end{enumerate}
+
+\subsection{Remember}
+
+\begin{itemize}
+    \item \textbf{There are no stupid questions:} If something isn't clear, ask!
+    \textbf{Start simple:} Don't try to understand everything at once
+    \item \textbf{Practice makes perfect:} Run lots of experiments
+    \textbf{Document everything:} Your notes will help others and yourself
+    \item \textbf{Think like a scientist:} Form hypotheses and test them
+    \textbf{Have fun:} This is cutting-edge research - enjoy it!
+\end{itemize}
+
+\section{Glossary}
+
+\begin{description}
+    \item[Audio Codec] A system for compressing and decompressing audio data
+    \item[Quantization] Converting continuous values to discrete ones
+    \item[Vector Quantization (VQ)] A method that represents vectors using a codebook
+    \item[Residual VQ (RVQ)] Multi-stage VQ that quantizes the error at each stage
+    \item[Product Quantization (PQ)] Quantizing different parts of a vector separately
+    \item[Gumbel-Softmax] A differentiable approximation of discrete sampling
+    \item[Codebook] A collection of reference vectors used for quantization
+    \item[Bitrate] The number of bits used per second of audio
+    \item[Compression Ratio] How much smaller a compressed file is compared to original
+    \item[End-to-End Training] Training all parts of a system together
+    \item[Loss Function] A function that measures how good a model's output is
+    \item[Gradient Descent] An optimization method that uses gradients to update parameters
+    \item[Neural Network] A machine learning model inspired by biological neurons
+    \item[Convolutional Layer] A type of neural network layer for processing grid-like data
+    \item[Recurrent Layer] A type of neural network layer with memory
+    \item[Embedding] A learned representation of data in a lower-dimensional space
+\end{description}
+
+\section{References and Further Reading}
+
+\begin{itemize}
+    \item \textbf{EnCodec Paper:} \url{https://arxiv.org/pdf/2210.13438}
+    \item \textbf{SoundStream Paper:} \url{https://arxiv.org/pdf/2107.03312}
+    \item \textbf{VALL-E Paper:} \url{https://arxiv.org/pdf/2301.02111}
+    \item \textbf{Vector Quantization Tutorial:} \url{https://www.pinecone.io/learn/vector-quantization/}
+    \item \textbf{Gumbel-Softmax Explanation:} \url{https://arxiv.org/abs/1611.01144}
+    \item \textbf{Audio Processing with PyTorch:} \url{https://pytorch.org/audio/stable/tutorials/audio_feature_extractions_tutorial.html}
+\end{itemize}
+
+\end{document}
